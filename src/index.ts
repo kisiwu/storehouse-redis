@@ -285,7 +285,7 @@ export class RedisManager<
     return await this.close();
   }
 
-  getModel?(name: string): unknown {
+  getModel?(_name: string): unknown {
     throw new Error('Method not implemented.');
   }
 

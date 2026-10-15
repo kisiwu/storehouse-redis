@@ -8,7 +8,7 @@
         // match output dir to input dir. e.g. lib/index instead of lib/src/index
         "rootDir": "./src",
         
-        "types": ["node"],
+        "types": ["node", "jest"],
         "module": "NodeNext",
         "lib": ["DOM", "ES6"],
         "target": "ES6",
@@ -32,6 +32,8 @@
         // significant perf increase by skipping checking .d.ts files, particularly those in node_modules. Recommended by TS
         "skipLibCheck": true,
         // error out if import and file system have a casing mismatch. Recommended by TS
-        "forceConsistentCasingInFileNames": true
+        "forceConsistentCasingInFileNames": true,
+
+        "isolatedModules": true
     }
 }
