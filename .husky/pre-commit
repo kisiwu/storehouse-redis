@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+npm run format:staged || exit 1
+npm run lint || exit 1
+# npm run build || exit 1
+git add .

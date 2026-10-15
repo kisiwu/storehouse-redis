@@ -1,0 +1,10 @@
+build
+lib
+dist
+.husky
+coverage
+
+# to ignore package.json, pnpm-lock.yaml, ...
+/*.json
+/*.yaml
+/*.yml
