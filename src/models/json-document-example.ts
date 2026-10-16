@@ -22,8 +22,12 @@ type CleanPath<P extends string> = P extends `$.${infer R}`
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Step<T, Key extends string> = T extends any[]
   ? Key extends `${number}`
-    ? T[number] // If key is a number index: extract item type (e.g., Array[0])
-    : Step<T[number], Key>[] // If key is a string: map array of objects to array of fields (e.g., Orders.id -> string[])
+    ? T[number] // Direct specific array item indexing
+    : T[number] extends infer Item // Inline block: Extract the array's object shape
+      ? Key extends keyof Item
+        ? Item[Key][]
+        : unknown // Map string keys across array of objects -> fields[]
+      : unknown
   : Key extends keyof T
     ? T[Key] // Standard object property lookup
     : unknown;
