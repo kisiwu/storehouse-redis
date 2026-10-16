@@ -1,10 +1,10 @@
 import { InvalidKeyError } from './errors';
 import type { OperationGuard } from './guard';
-import { JsonDelOptions } from '@redis/json/dist/lib/commands/DEL';
-import { JsonGetOptions } from '@redis/json/dist/lib/commands/GET';
+import type { JsonDelOptions } from '@redis/json/dist/lib/commands/DEL';
+import type { JsonGetOptions } from '@redis/json/dist/lib/commands/GET';
 import type { JsonSetOptions } from '@redis/json/dist/lib/commands/SET';
 import type { CreateOptions } from '@redis/search/dist/lib/commands/CREATE';
-import { FtDropIndexOptions } from '@redis/search/dist/lib/commands/DROPINDEX';
+import type { FtDropIndexOptions } from '@redis/search/dist/lib/commands/DROPINDEX';
 import type {
   RediSearchSchema,
   RedisJSON,
