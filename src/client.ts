@@ -1,4 +1,5 @@
 import type { RedisClientHealthCheckResult } from './health';
+import { CommandTimeoutError, ServerUnavailableError } from './models/errors';
 import Logger from '@novice1/logger';
 import {
   type IManager,
@@ -147,6 +148,9 @@ export class RedisManager<
   static readonly type = '@storehouse/redis';
 
   #connection: RedisClientType<M, F, S, RESP, TYPE_MAPPING>;
+
+  #commandTimeoutMs: number;
+
   /**
    * The name of this manager instance.
    * @protected
@@ -164,6 +168,7 @@ export class RedisManager<
   constructor(settings: RedisManagerArg<M, F, S, RESP, TYPE_MAPPING>) {
     this.name = settings.name || `Redis ${Date.now()}_${randomBytes(3).toString('hex')}`;
     this.#connection = createClient(settings?.config?.options);
+    this.#commandTimeoutMs = settings?.config?.options?.commandOptions?.timeout || 5000;
 
     this.#registerConnectionEvents();
 
@@ -273,6 +278,48 @@ export class RedisManager<
    */
   async isConnected(): Promise<boolean> {
     return this.#connection.isOpen;
+  }
+
+  /**
+   * Executes an asynchronous operation with the Redis connection,
+   * ensuring that the connection is ready and open, and enforcing a command timeout.
+   *
+   * Because node-redis' own command timeout stops once the command is written to
+   * the socket, so it does not protect against a frozen Redis.
+   *
+   * This method adds an additional layer of protection by enforcing a command timeout at the application level.
+   *
+   * The value of the command timeout is taken from the options provided during the client's initialization (commandOptions.timeout)
+   * or defaults to 5000 milliseconds if not specified.
+   *
+   * @param operation The asynchronous operation to execute with the Redis connection
+   * @returns A promise that resolves to the result of the operation or rejects with an error if the operation fails or times out
+   *
+   * @throws {ServerUnavailableError} If the Redis connection is not ready or not open
+   * @throws {CommandTimeoutError} If the operation exceeds the configured command timeout
+   */
+  async run<R>(operation: () => Promise<R>): Promise<R> {
+    if (!this.#connection.isReady) {
+      throw new ServerUnavailableError('not ready');
+    }
+    if (!this.#connection.isOpen) {
+      throw new ServerUnavailableError('circuit not open');
+    }
+    const pending = operation();
+    // If the timeout wins, the command may still settle later: avoid an unhandled rejection.
+    pending.catch(() => undefined);
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      const result = await Promise.race([
+        pending,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new CommandTimeoutError(this.#commandTimeoutMs)), this.#commandTimeoutMs);
+        }),
+      ]);
+      return result;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**
