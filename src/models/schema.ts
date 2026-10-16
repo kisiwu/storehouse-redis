@@ -12,6 +12,7 @@ import type {
   RespVersions,
   FtSearchOptions,
   RedisArgument,
+  RedisClientPoolType,
 } from 'redis';
 
 /**
@@ -73,7 +74,7 @@ export class Schema<TS extends Record<string, RedisJSON> = Record<string, RedisJ
    * Creates the index for the JSON Documents in Redis.
    * @param client the Redis client to use for creating the index
    */
-  async createIndex(client: RedisClientType): Promise<void> {
+  async createIndex(client: RedisClientType | RedisClientPoolType): Promise<void> {
     try {
       await client.ft.create('idx:' + this.#prefix, this.#schema, {
         ...(this.#options || {}),
@@ -101,8 +102,11 @@ export class Schema<TS extends Record<string, RedisJSON> = Record<string, RedisJ
     S extends RedisScripts,
     R extends RespVersions,
     T extends TypeMapping,
-  >(client: RedisClientType<M, F, S, R, T>, guard?: OperationGuard): Repository<TS> {
-    return new Repository<TS>(client as RedisClientType<M, F, S>, this, guard);
+  >(
+    client: RedisClientType<M, F, S, R, T> | RedisClientPoolType<M, F, S, R, T>,
+    guard?: OperationGuard
+  ): Repository<TS> {
+    return new Repository<TS>(client as RedisClientType<M, F, S> | RedisClientPoolType<M, F, S>, this, guard);
   }
 }
 
@@ -111,11 +115,11 @@ export class Schema<TS extends Record<string, RedisJSON> = Record<string, RedisJ
  * Provides methods to save, fetch, and remove JSON Documents, as well as create the index.
  */
 export class Repository<T extends Record<string, RedisJSON> = Record<string, RedisJSON>> {
-  #client: RedisClientType;
+  #client: RedisClientType | RedisClientPoolType;
   #schema: Schema<T>;
   #guard?: OperationGuard;
 
-  constructor(client: RedisClientType, schema: Schema<T>, guard?: OperationGuard) {
+  constructor(client: RedisClientType | RedisClientPoolType, schema: Schema<T>, guard?: OperationGuard) {
     this.#client = client;
     this.#schema = schema;
     this.#guard = guard;
