@@ -1,6 +1,10 @@
 import { InvalidKeyError } from './errors';
 import type { OperationGuard } from './guard';
+import { JsonDelOptions } from '@redis/json/dist/lib/commands/DEL';
+import { JsonGetOptions } from '@redis/json/dist/lib/commands/GET';
+import type { JsonSetOptions } from '@redis/json/dist/lib/commands/SET';
 import type { CreateOptions } from '@redis/search/dist/lib/commands/CREATE';
+import { FtDropIndexOptions } from '@redis/search/dist/lib/commands/DROPINDEX';
 import type {
   RediSearchSchema,
   RedisJSON,
@@ -143,11 +147,12 @@ export class Repository<T extends Record<string, RedisJSON> = Record<string, Red
    * Removes a JSON Document from Redis.
    *
    * @param id the id of the JSON Document to remove
+   * @param options optional JSON.DEL command options
    * @returns the number of keys that were removed
    */
-  async remove(id: unknown): Promise<number> {
+  async remove(id: unknown, options?: JsonDelOptions | undefined): Promise<number> {
     const key = this.fullKey(id);
-    return await this.exec(() => this.#client.json.del(key));
+    return await this.exec(() => this.#client.json.del(key, options));
   }
 
   /**
@@ -155,11 +160,12 @@ export class Repository<T extends Record<string, RedisJSON> = Record<string, Red
    *
    * @param id the id of the JSON Document to save
    * @param obj the JSON Document to save
+   * @param options optional JSON.SET command options
    * @returns the result of the Redis JSON.SET command
    */
-  async save(id: unknown, obj: T) {
+  async save(id: unknown, obj: T, options?: JsonSetOptions | undefined): Promise<'OK' | null> {
     const key = this.fullKey(id);
-    return await this.exec(() => this.#client.json.set(key, '$', obj));
+    return await this.exec(() => this.#client.json.set(key, '$', obj, options));
   }
 
   /**
@@ -172,20 +178,22 @@ export class Repository<T extends Record<string, RedisJSON> = Record<string, Red
 
   /**
    * Drops the index for the JSON Documents in Redis.
-   * @returns a promise that resolves when the index has been dropped successfully
+   * @param options optional FT.DROPINDEX command options
+   * @returns the number of indexes that were dropped
    */
-  async dropIndex(): Promise<void> {
-    await this.exec(() => this.#client.ft.dropIndex('idx:' + this.#schema.prefix));
+  async dropIndex(options?: FtDropIndexOptions | undefined): Promise<number> {
+    return await this.exec(() => this.#client.ft.dropIndex('idx:' + this.#schema.prefix, options));
   }
 
   /**
    * Fetches a JSON Document from Redis by its id.
    * @param id the id of the JSON Document to fetch
+   * @param options optional JSON.GET command options
    * @returns the JSON Document if found, otherwise null
    */
-  async fetch(id: unknown): Promise<null | T> {
+  async fetch(id: unknown, options?: JsonGetOptions | undefined): Promise<null | T> {
     const key = this.fullKey(id);
-    return (await this.exec(() => this.#client.json.get(key))) as null | T;
+    return (await this.exec(() => this.#client.json.get(key, options))) as null | T;
   }
 
   /**
