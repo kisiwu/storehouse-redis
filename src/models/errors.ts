@@ -1,4 +1,4 @@
-import { StandardSchemaV1 } from '@standard-schema/spec';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 
 /**
  * Thrown when the Redis server is unavailable.
@@ -23,11 +23,18 @@ export class CommandTimeoutError extends Error {
 
 /**
  * Thrown when a value cannot be turned into a valid Redis key: null,
- * undefined, empty string, or an object without a meaningful string form.
+ * undefined, empty string, or an empty buffer.
  */
 export class InvalidKeyError extends Error {
   constructor(key: unknown) {
-    const shown = key === '' ? 'empty string' : key === null || key === undefined ? String(key) : typeof key;
+    const shown =
+      key instanceof Buffer && key.length === 0
+        ? 'empty buffer'
+        : key === ''
+          ? 'empty string'
+          : key === null || key === undefined
+            ? String(key)
+            : typeof key;
     super(`Invalid key: ${shown}`);
     this.name = 'InvalidKeyError';
   }

@@ -1,4 +1,4 @@
-import { HealthCheckResult } from '@storehouse/core';
+import type { HealthCheckResult } from '@storehouse/core';
 
 /**
  * Extended health check result specific to Redis managers.

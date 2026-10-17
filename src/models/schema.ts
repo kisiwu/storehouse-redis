@@ -1,13 +1,13 @@
 import { InvalidKeyError, ValidationError } from './errors';
 import type { OperationGuard } from './guard';
 import type { GetPathType } from './path-type';
-import { RedisVariadicArgument } from '@redis/client/dist/lib/commands/generic-transformers';
+import type { RedisVariadicArgument } from '@redis/client/dist/lib/commands/generic-transformers';
 import type { JsonDelOptions } from '@redis/json/dist/lib/commands/DEL';
 import type { JsonGetOptions } from '@redis/json/dist/lib/commands/GET';
 import type { JsonSetOptions } from '@redis/json/dist/lib/commands/SET';
 import type { CreateOptions } from '@redis/search/dist/lib/commands/CREATE';
 import type { FtDropIndexOptions } from '@redis/search/dist/lib/commands/DROPINDEX';
-import { StandardSchemaV1 } from '@standard-schema/spec';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type {
   RediSearchSchema,
   RedisJSON,
@@ -22,32 +22,22 @@ import type {
   RedisClientPoolType,
 } from 'redis';
 
-/**
- * Converts a value into a valid string for use in Redis keys.
- * Accepts non-empty strings, numbers, and objects with a meaningful string form.
- * Throws InvalidKeyError for invalid values.
- */
-function toValidKey(id: unknown): string {
-  if (typeof id === 'string') {
-    if (id !== '') {
-      return id;
-    }
-  } else if (id instanceof Buffer) {
-    if (id.length > 0) {
-      return id.toString('hex');
-    }
-  } else if (typeof id === 'number' || typeof id === 'bigint') {
-    return String(id);
-  } else if (id !== null && typeof id === 'object') {
-    const value =
-      typeof (id as { toHexString?: unknown }).toHexString === 'function'
-        ? (id as { toHexString: () => string }).toHexString()
-        : String(id);
-    if (value !== '' && !value.startsWith('[object ')) {
-      return value;
-    }
-  }
+function toValidPrefix(prefix: string): string {
+  if (typeof prefix === 'string' && prefix !== '') return prefix;
+  throw new InvalidKeyError(prefix);
+}
+
+function toValidId(id: RedisArgument): RedisArgument {
+  if (typeof id === 'string' ? id !== '' : id instanceof Buffer && id.length > 0) return id;
   throw new InvalidKeyError(id);
+}
+
+function displayKey(key: RedisArgument): string {
+  return typeof key === 'string' ? key : `hex:${key.toString('hex')}`;
+}
+
+function isRootPath(path: RedisVariadicArgument): boolean {
+  return (typeof path === 'string' || path instanceof Buffer) && path.toString() === '$';
 }
 
 /**
@@ -86,7 +76,7 @@ export class Schema<TSchema extends StandardSchemaV1> {
     searchSchema: RediSearchSchema,
     options?: SanitizedSearchOptions | undefined
   ) {
-    this.#prefix = toValidKey(prefix);
+    this.#prefix = toValidPrefix(prefix);
     this.#schema = schema;
     this.#searchSchema = searchSchema;
     this.#options = options;
@@ -162,10 +152,14 @@ export class Repository<TSchema extends StandardSchemaV1> {
   }
 
   /**
-   * Redis key of an JSON Document.
+   * Computes the full Redis key for a JSON Document based on its id.
+   * @param id the id of the JSON Document
+   * @returns the full Redis key for the JSON Document
    */
-  fullKey(id: RedisArgument): string {
-    return `${this.#schema.prefix}:${toValidKey(id)}`;
+  fullKey(id: RedisArgument): RedisArgument {
+    const validId = toValidId(id);
+    const prefix = `${this.#schema.prefix}:`;
+    return typeof validId === 'string' ? prefix + validId : Buffer.concat([Buffer.from(prefix), validId]);
   }
 
   /**
@@ -197,7 +191,7 @@ export class Repository<TSchema extends StandardSchemaV1> {
     const key = this.fullKey(id);
     const result = await this.#schema.validate(value);
     if (result.issues) {
-      throw new ValidationError(`RedisJSON Validation failed at save for key: ${key}`, result.issues);
+      throw new ValidationError(`RedisJSON Validation failed at save for key: ${displayKey(key)}`, result.issues);
     }
     return await this.exec(() => this.#client.json.set(key, '$', result.value as JsonDocument<TSchema>, options));
   }
@@ -262,13 +256,13 @@ export class Repository<TSchema extends StandardSchemaV1> {
       options = pOptions;
     }
 
-    if (path !== '$') {
+    if (!isRootPath(path)) {
       return await this.exec(() => this.#client.json.set(key, path, value, options));
     }
 
     const result = await this.#schema.validate(value);
     if (result.issues) {
-      throw new ValidationError(`RedisJSON Validation failed at save for key: ${key}`, result.issues);
+      throw new ValidationError(`RedisJSON Validation failed at save for key: ${displayKey(key)}`, result.issues);
     }
 
     return await this.exec(() => this.#client.json.set(key, path, result.value as JsonDocument<TSchema>, options));
@@ -307,14 +301,14 @@ export class Repository<TSchema extends StandardSchemaV1> {
       const rawData = await this.#client.json.get(key, options);
       if (rawData === null) return null;
 
-      if (options?.path && options.path !== '$') {
+      if (options?.path && !isRootPath(options.path)) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return rawData as any;
       }
 
       const result = await this.#schema.validate(rawData);
       if (result.issues) {
-        throw new ValidationError(`RedisJSON Validation failed at fetch for key: ${key}`, result.issues);
+        throw new ValidationError(`RedisJSON Validation failed at fetch for key: ${displayKey(key)}`, result.issues);
       }
 
       return result.value;
