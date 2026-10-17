@@ -1,10 +1,9 @@
 // This is just an example of how schema and repository should be implemented
 // with a schema-driven approach (validation (ArkType, Valibot, ...), type inference, and safe data access)
+import { RedisVariadicArgument } from '@redis/client/dist/lib/commands/generic-transformers';
 import { JsonGetOptions } from '@redis/json/dist/lib/commands/GET';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { RedisClientType } from 'redis';
-
-// import { RedisVariadicArgument } from '@redis/client/dist/lib/commands/generic-transformers';
 
 // Properly normalize array brackets into dot segments (e.g., "items.0.name")
 type NormalizePath<P extends string> = P extends `${infer Head}[${infer Index}].${infer Tail}`
@@ -39,12 +38,16 @@ type ResolvePath<T, P extends string> = P extends `${infer Head}.${infer Tail}`
   ? ResolvePath<Step<T, Head>, Tail>
   : Step<T, P>;
 
+type JsonGetResult = Awaited<ReturnType<RedisClientType['json']['get']>>;
+
 // Final public entry point helper
-export type GetPathType<T, P extends string | undefined> = P extends string
-  ? CleanPath<P> extends ''
-    ? T
-    : ResolvePath<T, CleanPath<P>>
-  : T;
+export type GetPathType<T, P extends RedisVariadicArgument | undefined> = P extends undefined
+  ? T
+  : P extends string
+    ? CleanPath<P> extends ''
+      ? T
+      : ResolvePath<T, CleanPath<P>>
+    : JsonGetResult;
 
 export class RedisJsonClient<TSchema extends StandardSchemaV1> {
   #client: RedisClientType; // Your underlying Redis Client
@@ -58,15 +61,14 @@ export class RedisJsonClient<TSchema extends StandardSchemaV1> {
   /**
    * Fetches a JSON Document or a specific path from Redis by its id.
    */
-  async fetch<P extends string | undefined = undefined>(
+  async fetch<P extends RedisVariadicArgument | undefined = undefined>(
     key: string,
     options?: JsonGetOptions & { path?: P }
   ): Promise<null | GetPathType<StandardSchemaV1.InferOutput<TSchema>, P>> {
     const rawData = await this.#client.json.get(key, options);
     if (rawData === null) return null;
 
-    // eslint-disable-next-line no-useless-escape
-    if (options?.path && options.path !== '\$') {
+    if (options?.path && options.path !== '$') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return rawData as any;
     }
@@ -81,7 +83,7 @@ export class RedisJsonClient<TSchema extends StandardSchemaV1> {
   }
 }
 
-/**
+/*
 // Example usage of RedisJsonClient:
 
 import { type } from 'arktype';
@@ -115,5 +117,4 @@ const price = await client.fetch("user:99", { path: "$.orders[0].details.totalPr
 // Example 4: Mixed string dot-index notation
 const sku = await client.fetch("user:99", { path: "$.orders.0.skus.1" });
 // Type inferred as: string | null
-
- */
+*/

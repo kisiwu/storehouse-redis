@@ -1,6 +1,7 @@
 import { InvalidKeyError, ValidationError } from './errors';
 import type { OperationGuard } from './guard';
 import type { GetPathType } from './path-type';
+import { RedisVariadicArgument } from '@redis/client/dist/lib/commands/generic-transformers';
 import type { JsonDelOptions } from '@redis/json/dist/lib/commands/DEL';
 import type { JsonGetOptions } from '@redis/json/dist/lib/commands/GET';
 import type { JsonSetOptions } from '@redis/json/dist/lib/commands/SET';
@@ -20,8 +21,6 @@ import type {
   RedisArgument,
   RedisClientPoolType,
 } from 'redis';
-
-// import { RedisVariadicArgument } from '@redis/client/dist/lib/commands/generic-transformers';
 
 /**
  * Converts a value into a valid string for use in Redis keys.
@@ -299,7 +298,7 @@ export class Repository<TSchema extends StandardSchemaV1> {
    * @returns the JSON Document if found, otherwise null
    * @throws ValidationError if the JSON Document does not conform to the schema
    */
-  async fetch<P extends string | undefined = undefined>(
+  async fetch<P extends RedisVariadicArgument | undefined = undefined>(
     id: RedisArgument,
     options?: (JsonGetOptions & { path?: P }) | undefined
   ): Promise<null | GetPathType<JsonDocument<TSchema>, P>> {
