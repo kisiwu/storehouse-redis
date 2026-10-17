@@ -12,12 +12,14 @@ type NormalizePath<P extends string> = P extends `${infer Head}[${infer Index}].
     ? NormalizePath<`${Head}.${Index}`>
     : P;
 
-// Strip standard Redis JSONPath prefixes like "\$." or "/"
+// Strip standard Redis JSONPath prefixes like "\$." "\." or "/"
 type CleanPath<P extends string> = P extends `$.${infer R}`
   ? NormalizePath<R>
-  : P extends `/${infer R}`
+  : P extends `.${infer R}`
     ? NormalizePath<R>
-    : NormalizePath<P>;
+    : P extends `/${infer R}`
+      ? NormalizePath<R>
+      : NormalizePath<P>;
 
 // Resolve keys against objects, index specific arrays, OR map across arrays of objects
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,7 +40,7 @@ type ResolvePath<T, P extends string> = P extends `${infer Head}.${infer Tail}`
   ? ResolvePath<Step<T, Head>, Tail>
   : Step<T, P>;
 
-type JsonGetResult = Awaited<ReturnType<RedisClientType['json']['get']>>;
+export type JsonGetResult = Awaited<ReturnType<RedisClientType['json']['get']>>;
 
 // Final public entry point helper
 export type GetPathType<T, P extends RedisVariadicArgument | undefined> = P extends undefined
@@ -100,21 +102,21 @@ const complexSchema = type({
 
 const client = new RedisJsonClient(createClient(), complexSchema);
 
-const id = await client.fetch("user:99", { path: "$.id" });
+const id = await client.fetch("user:99", { path: ".id" });
 
 // Example 1: Extract an entire array of objects
-const orders = await client.fetch("user:99", { path: "$.orders" });
+const orders = await client.fetch("user:99", { path: ".orders" });
 // Type inferred as: { orderId: string; skus: string[]; details: { totalPrice: number }; }[] | null
 
 // Example 2: Index an array item using index notation
-const firstOrder = await client.fetch("user:99", { path: "$.orders[0]" });
+const firstOrder = await client.fetch("user:99", { path: ".orders[0]" });
 // Type inferred as: { orderId: string; skus: string[]; details: { totalPrice: number }; } | null
 
 // Example 3: Deep navigation inside an array of objects
-const price = await client.fetch("user:99", { path: "$.orders[0].details.totalPrice" });
+const price = await client.fetch("user:99", { path: ".orders[0].details.totalPrice" });
 // Type inferred as: number | null
 
 // Example 4: Mixed string dot-index notation
-const sku = await client.fetch("user:99", { path: "$.orders.0.skus.1" });
+const sku = await client.fetch("user:99", { path: ".orders.0.skus.1" });
 // Type inferred as: string | null
 */
