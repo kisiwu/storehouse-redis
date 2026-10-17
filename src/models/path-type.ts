@@ -4,6 +4,8 @@ import { JsonGetOptions } from '@redis/json/dist/lib/commands/GET';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { RedisClientType } from 'redis';
 
+// import { RedisVariadicArgument } from '@redis/client/dist/lib/commands/generic-transformers';
+
 // Properly normalize array brackets into dot segments (e.g., "items.0.name")
 type NormalizePath<P extends string> = P extends `${infer Head}[${infer Index}].${infer Tail}`
   ? NormalizePath<`${Head}.${Index}.${Tail}`>

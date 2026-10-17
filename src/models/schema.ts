@@ -1,10 +1,12 @@
-import { InvalidKeyError } from './errors';
+import { InvalidKeyError, ValidationError } from './errors';
 import type { OperationGuard } from './guard';
+import type { GetPathType } from './path-type';
 import type { JsonDelOptions } from '@redis/json/dist/lib/commands/DEL';
 import type { JsonGetOptions } from '@redis/json/dist/lib/commands/GET';
 import type { JsonSetOptions } from '@redis/json/dist/lib/commands/SET';
 import type { CreateOptions } from '@redis/search/dist/lib/commands/CREATE';
 import type { FtDropIndexOptions } from '@redis/search/dist/lib/commands/DROPINDEX';
+import { StandardSchemaV1 } from '@standard-schema/spec';
 import type {
   RediSearchSchema,
   RedisJSON,
@@ -19,6 +21,8 @@ import type {
   RedisClientPoolType,
 } from 'redis';
 
+// import { RedisVariadicArgument } from '@redis/client/dist/lib/commands/generic-transformers';
+
 /**
  * Converts a value into a valid string for use in Redis keys.
  * Accepts non-empty strings, numbers, and objects with a meaningful string form.
@@ -28,6 +32,10 @@ function toValidKey(id: unknown): string {
   if (typeof id === 'string') {
     if (id !== '') {
       return id;
+    }
+  } else if (id instanceof Buffer) {
+    if (id.length > 0) {
+      return id.toString('hex');
     }
   } else if (typeof id === 'number' || typeof id === 'bigint') {
     return String(id);
@@ -49,12 +57,16 @@ function toValidKey(id: unknown): string {
  */
 export type SanitizedSearchOptions = Omit<CreateOptions, 'ON' | 'PREFIX'>;
 
+export type JsonDocument<TSchema extends StandardSchemaV1> = StandardSchemaV1.InferOutput<TSchema> &
+  Record<string, RedisJSON>;
+
 /**
  * Represents a schema for JSON Documents stored in Redis.
  */
-export class Schema<TS extends Record<string, RedisJSON> = Record<string, RedisJSON>> {
+export class Schema<TSchema extends StandardSchemaV1> {
   #prefix: string;
-  #schema: RediSearchSchema;
+  #schema: TSchema;
+  #searchSchema: RediSearchSchema;
   #options?: SanitizedSearchOptions | undefined;
 
   get prefix(): string {
@@ -65,12 +77,19 @@ export class Schema<TS extends Record<string, RedisJSON> = Record<string, RedisJ
    * Creates a new schema for JSON Documents stored in Redis.
    *
    * @param prefix the prefix to use for Redis keys
-   * @param schema the RediSearch schema definition for the JSON Documents
+   * @param schema the TypeScript schema definition for the JSON Documents
+   * @param searchSchema the RediSearch schema definition for the JSON Documents
    * @param options additional options for creating the index
    */
-  constructor(prefix: string, schema: RediSearchSchema, options?: SanitizedSearchOptions | undefined) {
+  constructor(
+    prefix: string,
+    schema: TSchema,
+    searchSchema: RediSearchSchema,
+    options?: SanitizedSearchOptions | undefined
+  ) {
     this.#prefix = toValidKey(prefix);
     this.#schema = schema;
+    this.#searchSchema = searchSchema;
     this.#options = options;
   }
 
@@ -80,7 +99,7 @@ export class Schema<TS extends Record<string, RedisJSON> = Record<string, RedisJ
    */
   async createIndex(client: RedisClientType | RedisClientPoolType): Promise<void> {
     try {
-      await client.ft.create('idx:' + this.#prefix, this.#schema, {
+      await client.ft.create('idx:' + this.#prefix, this.#searchSchema, {
         ...(this.#options || {}),
         ON: 'JSON',
         PREFIX: this.#prefix,
@@ -92,6 +111,13 @@ export class Schema<TS extends Record<string, RedisJSON> = Record<string, RedisJ
         throw e;
       }
     }
+  }
+
+  async validate(
+    value: unknown,
+    options?: StandardSchemaV1.Options | undefined
+  ): Promise<StandardSchemaV1.Result<unknown>> {
+    return await this.#schema['~standard'].validate(value, options);
   }
 
   /**
@@ -109,8 +135,8 @@ export class Schema<TS extends Record<string, RedisJSON> = Record<string, RedisJ
   >(
     client: RedisClientType<M, F, S, R, T> | RedisClientPoolType<M, F, S, R, T>,
     guard?: OperationGuard
-  ): Repository<TS> {
-    return new Repository<TS>(client as RedisClientType<M, F, S> | RedisClientPoolType<M, F, S>, this, guard);
+  ): Repository<TSchema> {
+    return new Repository<TSchema>(client as RedisClientType<M, F, S> | RedisClientPoolType<M, F, S>, this, guard);
   }
 }
 
@@ -118,12 +144,12 @@ export class Schema<TS extends Record<string, RedisJSON> = Record<string, RedisJ
  * Represents a repository for JSON Documents stored in Redis.
  * Provides methods to save, fetch, and remove JSON Documents, as well as create the index.
  */
-export class Repository<T extends Record<string, RedisJSON> = Record<string, RedisJSON>> {
+export class Repository<TSchema extends StandardSchemaV1> {
   #client: RedisClientType | RedisClientPoolType;
-  #schema: Schema<T>;
+  #schema: Schema<TSchema>;
   #guard?: OperationGuard;
 
-  constructor(client: RedisClientType | RedisClientPoolType, schema: Schema<T>, guard?: OperationGuard) {
+  constructor(client: RedisClientType | RedisClientPoolType, schema: Schema<TSchema>, guard?: OperationGuard) {
     this.#client = client;
     this.#schema = schema;
     this.#guard = guard;
@@ -139,7 +165,7 @@ export class Repository<T extends Record<string, RedisJSON> = Record<string, Red
   /**
    * Redis key of an JSON Document.
    */
-  fullKey(id: unknown): string {
+  fullKey(id: RedisArgument): string {
     return `${this.#schema.prefix}:${toValidKey(id)}`;
   }
 
@@ -150,7 +176,7 @@ export class Repository<T extends Record<string, RedisJSON> = Record<string, Red
    * @param options optional JSON.DEL command options
    * @returns the number of keys that were removed
    */
-  async remove(id: unknown, options?: JsonDelOptions | undefined): Promise<number> {
+  async remove(id: RedisArgument, options?: JsonDelOptions | undefined): Promise<number> {
     const key = this.fullKey(id);
     return await this.exec(() => this.#client.json.del(key, options));
   }
@@ -159,13 +185,94 @@ export class Repository<T extends Record<string, RedisJSON> = Record<string, Red
    * Saves a JSON Document to Redis.
    *
    * @param id the id of the JSON Document to save
-   * @param obj the JSON Document to save
+   * @param value the JSON Document to save
    * @param options optional JSON.SET command options
    * @returns the result of the Redis JSON.SET command
+   * @throws ValidationError if the JSON Document does not conform to the schema
    */
-  async save(id: unknown, obj: T, options?: JsonSetOptions | undefined): Promise<'OK' | null> {
+  async save(
+    id: RedisArgument,
+    value: JsonDocument<TSchema>,
+    options?: JsonSetOptions | undefined
+  ): Promise<'OK' | null> {
     const key = this.fullKey(id);
-    return await this.exec(() => this.#client.json.set(key, '$', obj, options));
+    const result = await this.#schema.validate(value);
+    if (result.issues) {
+      throw new ValidationError(`RedisJSON Validation failed at save for key: ${key}`, result.issues);
+    }
+    return await this.exec(() => this.#client.json.set(key, '$', result.value as JsonDocument<TSchema>, options));
+  }
+
+  /**
+   * Sets the whole JSON Document (root path `$`), like {@link Repository.save}.
+   * The value is validated against the schema before being written.
+   *
+   * @param id the id of the JSON Document to set
+   * @param value the JSON Document to set
+   * @param options optional JSON.SET command options
+   * @returns the result of the Redis JSON.SET command
+   * @throws ValidationError if the JSON Document does not conform to the schema
+   */
+  async set(
+    id: RedisArgument,
+    value: JsonDocument<TSchema>,
+    options?: JsonSetOptions | undefined
+  ): Promise<'OK' | null>;
+  /**
+   * Sets the value at a given path of a JSON Document.
+   * Validation against the schema is only performed when `path` is the root (`$`);
+   * values written to any other path are sent to Redis as is.
+   *
+   * @param id the id of the JSON Document to modify
+   * @param path the JSONPath where to set the value
+   * @param value the value to set at `path`
+   * @param options optional JSON.SET command options
+   * @returns the result of the Redis JSON.SET command
+   * @throws ValidationError if `path` is the root and the JSON Document does not conform to the schema
+   */
+  async set(
+    id: RedisArgument,
+    path: RedisArgument,
+    value: JsonDocument<TSchema>,
+    options?: JsonSetOptions | undefined
+  ): Promise<'OK' | null>;
+  async set(
+    id: RedisArgument,
+    pPath: RedisArgument | JsonDocument<TSchema>,
+    pValue?: JsonSetOptions | JsonDocument<TSchema> | undefined,
+    pOptions?: JsonSetOptions | undefined
+  ): Promise<'OK' | null> {
+    const key = this.fullKey(id);
+    let path: RedisArgument = '$';
+    let value: JsonDocument<TSchema>;
+    let options: JsonSetOptions | undefined;
+    if (typeof pOptions === 'undefined') {
+      if (typeof pValue === 'undefined') {
+        value = pPath as JsonDocument<TSchema>;
+      } else if (typeof pPath === 'string' || pPath instanceof Buffer) {
+        path = pPath;
+        value = pValue as JsonDocument<TSchema>;
+        options = pOptions;
+      } else {
+        value = pPath as JsonDocument<TSchema>;
+        options = pValue as JsonSetOptions | undefined;
+      }
+    } else {
+      path = pPath as RedisArgument;
+      value = pValue as JsonDocument<TSchema>;
+      options = pOptions;
+    }
+
+    if (path !== '$') {
+      return await this.exec(() => this.#client.json.set(key, path, value, options));
+    }
+
+    const result = await this.#schema.validate(value);
+    if (result.issues) {
+      throw new ValidationError(`RedisJSON Validation failed at save for key: ${key}`, result.issues);
+    }
+
+    return await this.exec(() => this.#client.json.set(key, path, result.value as JsonDocument<TSchema>, options));
   }
 
   /**
@@ -190,10 +297,29 @@ export class Repository<T extends Record<string, RedisJSON> = Record<string, Red
    * @param id the id of the JSON Document to fetch
    * @param options optional JSON.GET command options
    * @returns the JSON Document if found, otherwise null
+   * @throws ValidationError if the JSON Document does not conform to the schema
    */
-  async fetch(id: unknown, options?: JsonGetOptions | undefined): Promise<null | T> {
+  async fetch<P extends string | undefined = undefined>(
+    id: RedisArgument,
+    options?: (JsonGetOptions & { path?: P }) | undefined
+  ): Promise<null | GetPathType<JsonDocument<TSchema>, P>> {
     const key = this.fullKey(id);
-    return (await this.exec(() => this.#client.json.get(key, options))) as null | T;
+    return await this.exec(async () => {
+      const rawData = await this.#client.json.get(key, options);
+      if (rawData === null) return null;
+
+      if (options?.path && options.path !== '$') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return rawData as any;
+      }
+
+      const result = await this.#schema.validate(rawData);
+      if (result.issues) {
+        throw new ValidationError(`RedisJSON Validation failed at fetch for key: ${key}`, result.issues);
+      }
+
+      return result.value;
+    });
   }
 
   /**
@@ -202,7 +328,7 @@ export class Repository<T extends Record<string, RedisJSON> = Record<string, Red
    * @param seconds Number of seconds until key expiration
    * @param mode  Expiration mode: NX (only if key has no expiry), XX (only if key has existing expiry), GT (only if new expiry is greater than current), LT (only if new expiry is less than current)
    */
-  async expire(id: unknown, seconds: number, mode?: 'NX' | 'XX' | 'GT' | 'LT' | undefined): Promise<number> {
+  async expire(id: RedisArgument, seconds: number, mode?: 'NX' | 'XX' | 'GT' | 'LT' | undefined): Promise<number> {
     const key = this.fullKey(id);
     return await this.exec(() => this.#client.expire(key, seconds, mode));
   }

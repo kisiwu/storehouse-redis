@@ -1,3 +1,5 @@
+import { StandardSchemaV1 } from '@standard-schema/spec';
+
 /**
  * Thrown when the Redis server is unavailable.
  */
@@ -28,5 +30,15 @@ export class InvalidKeyError extends Error {
     const shown = key === '' ? 'empty string' : key === null || key === undefined ? String(key) : typeof key;
     super(`Invalid key: ${shown}`);
     this.name = 'InvalidKeyError';
+  }
+}
+
+export class ValidationError extends Error {
+  readonly issues?: readonly StandardSchemaV1.Issue[];
+
+  constructor(message: string, issues: readonly StandardSchemaV1.Issue[]) {
+    super(`ValidationError: ${message}`);
+    this.name = 'ValidationError';
+    this.issues = issues;
   }
 }

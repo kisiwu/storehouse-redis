@@ -21,6 +21,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.12.0(supports-color@7.2.0))
+      '@redis/client':
+        specifier: ^6.3.0
+        version: 6.3.0
       '@redis/json':
         specifier: ^6.3.0
         version: 6.3.0(@redis/client@6.3.0)
