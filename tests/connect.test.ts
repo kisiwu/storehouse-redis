@@ -3,6 +3,7 @@ import { RedisManager, getManager, getConnection } from '../src/index';
 import type { RedisClientType } from 'redis';
 import { logger } from './logger';
 import { AlbumSchema } from './models';
+import { randomUUID } from 'node:crypto';
 
 describe('connect', function () {
   test('should establish a connection to Redis', async () => {
@@ -54,6 +55,9 @@ describe('connect', function () {
 
       // Saving a new album to the repository
 
+      const ID = `${randomUUID()}`;
+      logger.info('generated album ID:', ID);
+
       const album = {
         artist: 'Mushroomhead',
         title: 'The Righteous & The Butterfly',
@@ -62,15 +66,15 @@ describe('connect', function () {
         songDurations: [204, 290, 196, 210, 211, 105, 244, 245, 209, 252, 259, 200, 215, 219],
         // outOfPublication: true
       };
-      const status = await Albums.save('test', album);
+      const status = await Albums.save(ID, album);
       if (status === 'OK') {
         logger.info('album saved successfully');
-        Albums.expire('test', 120 * 1000); // set expiration for the saved album
+        Albums.expire(ID, 120 * 1000); // set expiration for the saved album
       }
 
       // Fetching the album after saving it
 
-      const fetchedAlbum = await Albums.fetch('test');
+      const fetchedAlbum = await Albums.fetch(ID);
       if (fetchedAlbum) {
         logger.info('fetched album titled:', fetchedAlbum.title);
       }
@@ -78,7 +82,7 @@ describe('connect', function () {
       // Fetching various parts of the album using JSON paths
       // Noting that any path starting with '$' will return an array of results
 
-      const rootAlbum = await Albums.fetch('test', { path: '$' });
+      const rootAlbum = await Albums.fetch(ID, { path: '$' });
       expect(rootAlbum).toEqual([{
         artist: 'Mushroomhead',
         title: 'The Righteous & The Butterfly',
@@ -87,27 +91,27 @@ describe('connect', function () {
         songDurations: [204, 290, 196, 210, 211, 105, 244, 245, 209, 252, 259, 200, 215, 219],
       }]);
 
-      const artist = await Albums.fetch('test', { path: '$.artist' });
+      const artist = await Albums.fetch(ID, { path: '$.artist' });
       expect(artist).toEqual(['Mushroomhead']);
 
-      const firstSongDuration = await Albums.fetch('test', { path: '$.songDurations[0]' });
+      const firstSongDuration = await Albums.fetch(ID, { path: '$.songDurations[0]' });
       expect(firstSongDuration).toEqual([204]);
 
-      const allSongDurations = await Albums.fetch('test', { path: '$.songDurations[*]' });
+      const allSongDurations = await Albums.fetch(ID, { path: '$.songDurations[*]' });
       expect(allSongDurations).toHaveLength(14);
 
-      const missing = await Albums.fetch('test', { path: '$.missing' });
+      const missing = await Albums.fetch(ID, { path: '$.missing' });
       expect(missing).toEqual([]);
 
       // Legacy unwrapped fetches
 
-      const legacyArtist = await Albums.fetch('test', { path: '.artist' });
+      const legacyArtist = await Albums.fetch(ID, { path: '.artist' });
       expect(legacyArtist).toBe('Mushroomhead'); // legacy: unwrapped
 
-      const legacyFirstSongDuration = await Albums.fetch('test', { path: 'songDurations[0]' });
+      const legacyFirstSongDuration = await Albums.fetch(ID, { path: 'songDurations[0]' });
       expect(legacyFirstSongDuration).toBe(204); // legacy: unwrapped
 
-      const artistAndYear = await Albums.fetch('test', {
+      const artistAndYear = await Albums.fetch(ID, {
         path: [
           'artist',
           'year'
@@ -132,7 +136,7 @@ describe('connect', function () {
 
       // Deleting the album after the search
 
-      logger.info('deleted album', await Albums?.remove('test'));
+      logger.info('deleted album', await Albums?.remove(ID));
 
       // Checking the number of albums after deletion
 
@@ -154,18 +158,18 @@ describe('connect', function () {
         songDurations: [204, 290, 196, 210, 211, 105, 244, 245, 209, 252, 259, 200, 215, 219],
         outOfPublication: true
       }
-      const r = await Albums?.save('test', album)
+      const r = await Albums?.save(ID, album)
       if (r?.[EntityId])
         Albums?.expire(r[EntityId], 120 * 1000)
       logger.info('added new album from', r?.artist, `ID=${r?.[EntityId]}`);
       logger.log('current nb albums:', await Albums?.search().return.count());
 
-      const fetchedAlbum = await Albums?.fetch('test');
+      const fetchedAlbum = await Albums?.fetch(ID);
       if (fetchedAlbum) {
         logger.log('found album title:', fetchedAlbum.title);
       }
 
-      logger.info('deleted album', await Albums?.remove('test'));
+      logger.info('deleted album', await Albums?.remove(ID));
 
       logger.log('current nb albums:', await Albums?.search().return.count());
       */
