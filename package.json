@@ -1,5 +1,5 @@
 {
-  "name": "storehouse-redis",
+  "name": "@storehouse/redis",
   "version": "0.1.0",
   "description": "",
   "main": "lib/index.js",
