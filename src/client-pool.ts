@@ -72,7 +72,7 @@ import {
   type TypeMapping,
 } from 'redis';
 
-const Log = Logger.debugger('@storehouse/redis:manager');
+const Log = Logger.debugger('@storehouse/redis:poolmanager');
 
 /**
  * Configuration argument for creating a {@link RedisPoolManager} instance.
