@@ -1,9 +1,9 @@
-import { Storehouse } from '@storehouse/core';
 import { RedisManager, getManager, getConnection } from '../src/index';
-import type { RedisClientType } from 'redis';
 import { logger } from './logger';
 import { AlbumSchema } from './models';
+import { Storehouse } from '@storehouse/core';
 import { randomUUID } from 'node:crypto';
+import type { RedisClientType } from 'redis';
 
 describe('connect', function () {
   test('should establish a connection to Redis', async () => {
@@ -16,18 +16,26 @@ describe('connect', function () {
               password: process.env.TEST_REDIS_PASSWORD,
               socket: {
                 host: process.env.TEST_REDIS_HOST,
-                port: typeof process.env.TEST_REDIS_PORT === 'string' ? parseInt(process.env.TEST_REDIS_PORT) : undefined
+                port:
+                  typeof process.env.TEST_REDIS_PORT === 'string' ? parseInt(process.env.TEST_REDIS_PORT) : undefined,
+                connectTimeout: 2000,
+                reconnectStrategy(retries) {
+                  if (retries > 3) {
+                    return new Error('Too many retries');
+                  }
+                  return 1000;
+                },
               },
               disableOfflineQueue: true,
               commandOptions: {
-                timeout: 5000
-              }
-            }
-          }
-        }
+                timeout: 5000,
+              },
+            },
+          },
+        },
       });
 
-      const conn: RedisClientType = getConnection(Storehouse, 'redis')
+      const conn: RedisClientType = getConnection(Storehouse, 'redis');
       await conn.connect();
       logger.info('retrieved connection');
       logger.info('events=', conn.eventNames());
@@ -83,13 +91,15 @@ describe('connect', function () {
       // Noting that any path starting with '$' will return an array of results
 
       const rootAlbum = await Albums.fetch(ID, { path: '$' });
-      expect(rootAlbum).toEqual([{
-        artist: 'Mushroomhead',
-        title: 'The Righteous & The Butterfly',
-        year: 2014,
-        genres: ['metal'],
-        songDurations: [204, 290, 196, 210, 211, 105, 244, 245, 209, 252, 259, 200, 215, 219],
-      }]);
+      expect(rootAlbum).toEqual([
+        {
+          artist: 'Mushroomhead',
+          title: 'The Righteous & The Butterfly',
+          year: 2014,
+          genres: ['metal'],
+          songDurations: [204, 290, 196, 210, 211, 105, 244, 245, 209, 252, 259, 200, 215, 219],
+        },
+      ]);
 
       const artist = await Albums.fetch(ID, { path: '$.artist' });
       expect(artist).toEqual(['Mushroomhead']);
@@ -112,10 +122,7 @@ describe('connect', function () {
       expect(legacyFirstSongDuration).toBe(204); // legacy: unwrapped
 
       const artistAndYear = await Albums.fetch(ID, {
-        path: [
-          'artist',
-          'year'
-        ]
+        path: ['artist', 'year'],
       });
       expect(artistAndYear).toEqual({ artist: 'Mushroomhead', year: 2014 });
 

@@ -15,5 +15,7 @@
   "prettier.proseWrap": "preserve",
   "prettier.htmlWhitespaceSensitivity": "css",
   "prettier.endOfLine": "lf",
-  "prettier.embeddedLanguageFormatting": "auto"
+  "prettier.embeddedLanguageFormatting": "auto",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" }
 }

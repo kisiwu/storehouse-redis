@@ -1,6 +1,6 @@
-import * as v from 'valibot';
-import { SCHEMA_FIELD_TYPE } from 'redis';
 import { Schema } from '../src/index';
+import { SCHEMA_FIELD_TYPE } from 'redis';
+import * as v from 'valibot';
 
 export const AlbumSchema = new Schema(
   'test:album',
@@ -16,7 +16,7 @@ export const AlbumSchema = new Schema(
     '$.artist': {
       type: SCHEMA_FIELD_TYPE.TEXT,
       SORTABLE: true,
-      AS: 'artist'
+      AS: 'artist',
     },
     '$.title': {
       type: SCHEMA_FIELD_TYPE.TEXT,
@@ -26,7 +26,7 @@ export const AlbumSchema = new Schema(
     '$.year': {
       type: SCHEMA_FIELD_TYPE.NUMERIC,
       SORTABLE: true,
-      AS: 'year'
-    }
+      AS: 'year',
+    },
   }
-)
+);

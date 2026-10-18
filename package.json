@@ -5,8 +5,8 @@
   "main": "lib/index.js",
   "scripts": {
     "build": "pnpm exec tsc",
-    "format": "cross-env NODE_OPTIONS=--experimental-strip-types prettier --write ./src",
-    "format:check": "cross-env NODE_OPTIONS=--experimental-strip-types prettier --check ./src",
+    "format": "cross-env NODE_OPTIONS=--experimental-strip-types prettier --write ./src ./tests",
+    "format:check": "cross-env NODE_OPTIONS=--experimental-strip-types prettier --check ./src ./tests",
     "format:staged": "cross-env NODE_OPTIONS=--experimental-strip-types lint-staged",
     "lint": "eslint .",
     "test": "jest",
