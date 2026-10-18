@@ -3,7 +3,7 @@ import { SCHEMA_FIELD_TYPE } from 'redis';
 import { Schema } from '../src/index';
 
 export const AlbumSchema = new Schema(
-  'album',
+  'test:album',
   v.object({
     artist: v.string(),
     title: v.string(),

@@ -286,11 +286,41 @@ export class Repository<TSchema extends StandardSchemaV1> {
   }
 
   /**
-   * Fetches a JSON Document from Redis by its id.
+   * @returns information about the index if it exists, or null if the index does not exist
+   */
+  async indexInfo(): Promise<Awaited<ReturnType<RedisClientType['ft']['info']>> | null> {
+    let indexExists: Awaited<ReturnType<RedisClientType['ft']['info']>> | null;
+    try {
+      indexExists = await this.#client.ft.info('idx:' + this.#schema.prefix);
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        (err.message.includes('SEARCH_INDEX_NOT_FOUND') || err.message.includes('not found in database')) // support for valkey
+      ) {
+        indexExists = null;
+      } else {
+        throw err; // Re-throw if it's a different network or Redis issue
+      }
+    }
+    return indexExists;
+  }
+
+  /**
+   * Fetches a JSON Document, or part of it, from Redis by its id.
+   *
+   * The shape of the result depends on `options.path`:
+   * - no path or `.`: the whole JSON Document, validated against the schema.
+   * - `$`: the whole JSON Document wrapped in an array (RedisJSON 2.x JSONPath reply).
+   *   The document is validated against the schema.
+   * - any other JSONPath (starting with `$`): an array of the matches, exactly as returned
+   *   by Redis (empty if nothing matches). It is not validated.
+   * - any other path (legacy syntax, such as `.artist` or `artist`): the value at that path, as returned
+   *   by Redis. It is not validated.
+   *
    * @param id the id of the JSON Document to fetch
    * @param options optional JSON.GET command options
-   * @returns the JSON Document if found, otherwise null
-   * @throws ValidationError if the JSON Document does not conform to the schema
+   * @returns the result described above, or null if the JSON Document does not exist
+   * @throws ValidationError if the JSON Document is validated and does not conform to the schema
    */
   async fetch<P extends RedisVariadicArgument | undefined = undefined>(
     id: RedisArgument,
@@ -301,10 +331,26 @@ export class Repository<TSchema extends StandardSchemaV1> {
       const rawData = await this.#client.json.get(key, options);
       if (rawData === null) return null;
 
-      if (options?.path && !isRootPath(options.path)) {
+      const path = options?.path;
+      if (typeof path === 'string' && path.startsWith('$')) {
+        if (path !== '$' || !Array.isArray(rawData) || rawData.length === 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return rawData as any;
+        }
+        const result = await this.#schema.validate(rawData[0]);
+        if (result.issues) {
+          throw new ValidationError(`RedisJSON Validation failed at fetch for key: ${displayKey(key)}`, result.issues);
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return [result.value] as any;
+      }
+
+      if (path !== undefined && path !== '.') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return rawData as any;
       }
+
+      // validate rawData as the root document (path undefined or ".")
 
       const result = await this.#schema.validate(rawData);
       if (result.issues) {
@@ -335,7 +381,45 @@ export class Repository<TSchema extends StandardSchemaV1> {
   async search(
     query: RedisArgument,
     options?: FtSearchOptions | undefined
-  ): Promise<ReturnType<RedisClientType['ft']['search']>> {
+  ): ReturnType<RedisClientType['ft']['search']> {
     return await this.exec(() => this.#client.ft.search('idx:' + this.#schema.prefix, query, options));
   }
 }
+
+/*
+// Example usage of Repository:
+
+import { type } from 'arktype';
+import { createClient } from 'redis';
+
+const complexSchema = type({
+  id: "string",
+  orders: [{
+    orderId: "string",
+    skus: "string[]",
+    details: { totalPrice: "number" }
+  }]
+});
+
+const client = new Repository(createClient(), new Schema('user', complexSchema, {}));
+
+// get the ID of the user with key "user:99"
+const id = await client.fetch("99", { path: ".id" });
+// Type inferred as: string | null
+
+// Example 1: Extract an entire array of objects
+const orders = await client.fetch("99", { path: ".orders" });
+// Type inferred as: { orderId: string; skus: string[]; details: { totalPrice: number }; }[] | null
+
+// Example 2: Index an array item using index notation
+const firstOrder = await client.fetch("99", { path: ".orders[0]" });
+// Type inferred as: { orderId: string; skus: string[]; details: { totalPrice: number }; } | null
+
+// Example 3: Deep navigation inside an array of objects
+const price = await client.fetch("99", { path: ".orders[0].details.totalPrice" });
+// Type inferred as: number | null
+
+// Example 4: Mixed string dot-index notation
+const sku = await client.fetch("99", { path: ".orders.0.skus.1" });
+// Type inferred as: string | null
+*/
