@@ -1,6 +1,9 @@
 import type { RedisClientHealthCheckResult } from './health';
 import { CommandTimeoutError, ServerUnavailableError } from './models/errors';
+import type { OperationGuard } from './models/guard';
+import type { Repository, Schema } from './models/schema';
 import Logger from '@novice1/logger';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import {
   type IManager,
   type ManagerArg,
@@ -140,7 +143,9 @@ export class RedisManager<
   S extends RedisScripts = RedisScripts,
   RESP extends RespVersions = 3,
   TYPE_MAPPING extends TypeMapping = TypeMapping,
-> implements IManager {
+>
+  implements IManager, OperationGuard
+{
   /**
    * Identifier for the manager type.
    * @readonly
@@ -320,6 +325,16 @@ export class RedisManager<
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /**
+   * Creates a repository for the given schema, allowing interaction with the corresponding Redis data.
+   *
+   * @param schema The schema for which to create the repository
+   * @returns A repository instance for the specified schema
+   */
+  createModel<TSchema extends StandardSchemaV1>(schema: Schema<TSchema>): Repository<TSchema> {
+    return schema.createRepository(this.getConnection(), this);
   }
 
   /**

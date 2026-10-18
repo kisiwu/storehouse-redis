@@ -44,7 +44,7 @@ describe('connect', function () {
 
       // Initialize the Albums repository (REDIS JSON and REDIS SEARCH with schema-driven approach)
 
-      const Albums = AlbumSchema.createRepository(conn, manager);
+      const Albums = manager.createModel(AlbumSchema);
 
       // Creating indexes before saving to avoid a potential search issue (backfilling)
 
