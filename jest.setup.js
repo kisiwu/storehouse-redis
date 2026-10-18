@@ -1,5 +1,4 @@
 // jest.setup.js
-// jest.setup.js
 const fs = require('fs');
 const path = require('path');
 

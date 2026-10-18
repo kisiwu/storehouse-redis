@@ -1,3 +1,4 @@
+// eslint.config.mjs
 import { FlatCompat } from '@eslint/eslintrc';
 import js from '@eslint/js';
 import stylisticJs from '@stylistic/eslint-plugin';
