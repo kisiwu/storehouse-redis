@@ -108,6 +108,7 @@ export interface RedisPoolManagerArg<
    * Optional configuration for the Redis manager.
    */
   config?: {
+    debugLevel?: number | 'error' | 'warn' | 'info' | 'debug';
     /**
      * Redis client connection options.
      * See redis client documentation for available options.
@@ -209,6 +210,8 @@ export class RedisPoolManager<
 
   #commandTimeoutMs: number;
 
+  protected logger: Logger.Debugger;
+
   /**
    * The name of this manager instance.
    * @protected
@@ -224,13 +227,17 @@ export class RedisPoolManager<
    * Connection events (error, connect, ready, end, reconnecting) are automatically registered and logged.
    */
   constructor(settings: RedisPoolManagerArg<M, F, S, RESP, TYPE_MAPPING>) {
-    this.name = settings.name || `Redis ${Date.now()}_${randomBytes(3).toString('hex')}`;
+    this.name = settings.name || `redis_${Date.now()}_${randomBytes(1).toString('hex')}`;
+    this.logger = Log.extend(`${this.name}`);
+    if (typeof settings.config?.debugLevel !== 'undefined') {
+      this.logger.setLevel(settings.config.debugLevel);
+    }
     this.#connection = createClientPool(settings?.config?.options, settings?.config?.poolOptions);
     this.#commandTimeoutMs = settings?.config?.options?.commandOptions?.timeout || 5000;
 
     this.#registerConnectionEvents();
 
-    Log.info(`[${this.name}] RedisConnection created. Must call "RedisConnection.connect()".`);
+    this.logger.debug(`RedisConnection created. Must call "RedisConnection.connect()".`);
   }
 
   /**
@@ -242,19 +249,19 @@ export class RedisPoolManager<
   #registerConnectionEvents() {
     this.#connection
       .on('error', (err) => {
-        Log.error(`[${this.name}] Redis Client Error`, err);
+        this.logger.error(`Redis Client Error`, err);
       })
       .on('connect', () => {
-        Log.info(`[${this.name}] connecting ...`, this.name);
+        this.logger.debug(`connecting ...`);
       })
       .on('ready', () => {
-        Log.info(`[${this.name}] connected!`, this.name);
+        this.logger.info(`connected!`);
       })
       .on('end', () => {
-        Log.warn(`[${this.name}] disconnected!`, this.name);
+        this.logger.warn(`disconnected!`);
       })
       .on('reconnecting', () => {
-        Log.info(`[${this.name}] reconnecting ...`, this.name);
+        this.logger.info(`reconnecting ...`);
       });
   }
 

@@ -2,5 +2,5 @@ allowBuilds:
   '@parcel/watcher': true
   unrs-resolver: true
 
-#overrides:
-#  test-exclude>glob: "^13.0.6"
+overrides:
+  "@istanbuljs/load-nyc-config>js-yaml": "^5.5.0" # remove vulnerability audit from sprintf-js>js-yaml@3

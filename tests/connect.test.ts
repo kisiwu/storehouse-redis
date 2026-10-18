@@ -1,3 +1,6 @@
+/**
+ * Tested with a Redis server 8.10.2 and a Valkey server on redis 7.2.4
+ */
 import { RedisManager, getManager, getConnection } from '../src/index';
 import { logger } from './logger';
 import { AlbumSchema } from './models';
@@ -12,6 +15,7 @@ describe('connect', function () {
         redis: {
           type: RedisManager,
           config: {
+            debugLevel: 'info',
             options: {
               password: process.env.TEST_REDIS_PASSWORD,
               socket: {
@@ -28,7 +32,7 @@ describe('connect', function () {
               },
               disableOfflineQueue: true,
               commandOptions: {
-                timeout: 5000,
+                timeout: 1000,
               },
             },
           },
@@ -40,6 +44,13 @@ describe('connect', function () {
       logger.info('retrieved connection');
       logger.info('events=', conn.eventNames());
 
+      // only retrieve the line containing redis_version, removing \n and \r characters
+      const serverVersion: string | undefined = (await conn.info('Server'))
+        .split('\n')
+        .filter((line) => line.startsWith('redis_version'))
+        .map((line) => line.replace(/\r/g, '').replace(/\n/g, ''))[0];
+      logger.warn('Redis server version:', serverVersion);
+
       const manager = getManager(Storehouse);
 
       // Initialize the Albums repository (REDIS JSON and REDIS SEARCH with schema-driven approach)
@@ -47,9 +58,6 @@ describe('connect', function () {
       const Albums = manager.createModel(AlbumSchema);
 
       // Creating indexes before saving to avoid a potential search issue (backfilling)
-
-      // await manager.dropIndexes() // force dropping indexes
-      // await manager.createIndexes()
 
       // Drop existing index before creating new one
       if (await Albums.indexInfo()) {
