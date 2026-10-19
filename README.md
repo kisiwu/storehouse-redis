@@ -17,7 +17,15 @@ npm install @storehouse/core @storehouse/redis redis
 
 `@storehouse/core` and `redis` (^6.3.0) are peer dependencies.
 
-Repositories rely on the RedisJSON and RediSearch modules, so you need a server that provides them (Redis 8, Redis Stack, or a compatible server such as Valkey with the JSON and search modules). Plain key/value usage through the underlying client works on any Redis.
+Any Redis server works for the connection managers and plain commands (`get`, `set`, ...). The schema-driven repositories need extra Redis modules, and only for the features you use:
+
+| Feature                                                      | Requires                                                                      |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Connection managers, plain key/value commands                | Nothing, any Redis                                                            |
+| Repository document methods (`save`, `fetch`, `remove`, ...) | [RedisJSON](https://redis.io/docs/latest/develop/data-types/json/)            |
+| Index and search methods (`createIndex`, `search`, ...)      | [RediSearch](https://redis.io/docs/latest/develop/interact/search-and-query/) |
+
+Redis 8 and Redis Stack include both. Compatible servers such as Valkey work when they have the JSON and search modules loaded.
 
 ## Quick start
 
