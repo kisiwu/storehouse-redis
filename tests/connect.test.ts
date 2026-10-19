@@ -118,7 +118,7 @@ describe('connect', function () {
       const allSongDurations = await Albums.fetch(ID, { path: '$.songDurations[*]' });
       expect(allSongDurations).toHaveLength(14);
 
-      const missing = await Albums.fetch(ID, { path: '$.missing' });
+      const missing = await Albums.fetch(ID, { path: '$.missing' }); // RedisJSON[]
       expect(missing).toEqual([]);
 
       // Legacy unwrapped fetches

@@ -52,11 +52,11 @@ await Storehouse.close();
 
 `RedisManagerArg`:
 
-| Option                | Type                                          | Description                                                                              |
-| --------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `name`                | `string`                                      | Manager name. Generated when omitted.                                                    |
-| `config.options`      | `RedisClientOptions`                          | Any [node-redis client option](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md) (`url`, `socket`, `password`, ...). |
-| `config.debugLevel`   | `number \| 'error' \| 'warn' \| 'info' \| 'debug'` | Log level of the manager's logger.                                                  |
+| Option              | Type                                               | Description                                                                                                                                      |
+| ------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`              | `string`                                           | Manager name. Generated when omitted.                                                                                                            |
+| `config.options`    | `RedisClientOptions`                               | Any [node-redis client option](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md) (`url`, `socket`, `password`, ...). |
+| `config.debugLevel` | `number \| 'error' \| 'warn' \| 'info' \| 'debug'` | Log level of the manager's logger.                                                                                                               |
 
 ```ts
 Storehouse.add({
@@ -96,15 +96,15 @@ const value = await manager.run(() => manager.getConnection().get('hello'));
 
 ## Manager API
 
-| Method                                 | Description                                                             |
-| -------------------------------------- | ----------------------------------------------------------------------- |
-| `connect()`                            | Opens the connection. Resolves to the manager.                          |
-| `close()` / `closeConnection()`        | Closes the connection (`QUIT` for `RedisManager`).                      |
-| `isConnected()`                        | `true` when the connection is open.                                     |
-| `getConnection()`                      | Returns the underlying node-redis client (or pool).                     |
-| `run(operation)`                       | Runs an operation with availability check and command timeout.          |
-| `createModel(schema)`                  | Creates a `Repository` for a `Schema`.                                  |
-| `healthCheck()`                        | Pings Redis and returns a detailed result.                              |
+| Method                          | Description                                                    |
+| ------------------------------- | -------------------------------------------------------------- |
+| `connect()`                     | Opens the connection. Resolves to the manager.                 |
+| `close()` / `closeConnection()` | Closes the connection (`QUIT` for `RedisManager`).             |
+| `isConnected()`                 | `true` when the connection is open.                            |
+| `getConnection()`               | Returns the underlying node-redis client (or pool).            |
+| `run(operation)`                | Runs an operation with availability check and command timeout. |
+| `createModel(schema)`           | Creates a `Repository` for a `Schema`.                         |
+| `healthCheck()`                 | Pings Redis and returns a detailed result.                     |
 
 ### Health check
 
@@ -186,19 +186,19 @@ await Albums.remove('1');
 
 ### Repository API
 
-| Method                                | Description                                                                                         |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `save(id, value, options?)`           | `JSON.SET` at the root, after schema validation. Throws `ValidationError` on invalid data.          |
-| `set(id, value, options?)`            | Same as `save`.                                                                                     |
-| `set(id, path, value, options?)`      | Sets a value at `path`. Only validated when `path` is the root (`$`).                               |
-| `fetch(id, { path? })`                | `JSON.GET`. See [Fetching paths](#fetching-paths).                                                  |
-| `remove(id, options?)`                | `JSON.DEL`. Resolves to the number of removed keys.                                                 |
-| `expire(id, seconds, mode?)`          | `EXPIRE` on the document key (`mode`: `NX`, `XX`, `GT`, `LT`).                                      |
-| `createIndex()`                       | `FT.CREATE` (no error if the index already exists).                                                 |
-| `dropIndex(options?)`                 | `FT.DROPINDEX`.                                                                                     |
-| `indexInfo()`                         | `FT.INFO`, or `null` if the index does not exist.                                                   |
-| `search(query, options?)`             | `FT.SEARCH` on the schema's index.                                                                  |
-| `fullKey(id)`                         | The full Redis key, `<prefix>:<id>`.                                                                |
+| Method                           | Description                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| `save(id, value, options?)`      | `JSON.SET` at the root, after schema validation. Throws `ValidationError` on invalid data. |
+| `set(id, value, options?)`       | Same as `save`.                                                                            |
+| `set(id, path, value, options?)` | Sets a value at `path`. Only validated when `path` is the root (`$`).                      |
+| `fetch(id, { path? })`           | `JSON.GET`. See [Fetching paths](#fetching-paths).                                         |
+| `remove(id, options?)`           | `JSON.DEL`. Resolves to the number of removed keys.                                        |
+| `expire(id, seconds, mode?)`     | `EXPIRE` on the document key (`mode`: `NX`, `XX`, `GT`, `LT`).                             |
+| `createIndex()`                  | `FT.CREATE`.                                                                               |
+| `dropIndex(options?)`            | `FT.DROPINDEX`.                                                                            |
+| `indexInfo()`                    | `FT.INFO`, or `null` if the index does not exist.                                          |
+| `search(query, options?)`        | `FT.SEARCH` on the schema's index.                                                         |
+| `fullKey(id)`                    | The full Redis key, `<prefix>:<id>`.                                                       |
 
 Ids can be strings or Buffers. Empty ids and prefixes throw `InvalidKeyError`.
 
@@ -206,13 +206,13 @@ Ids can be strings or Buffers. Empty ids and prefixes throw `InvalidKeyError`.
 
 The shape of `fetch` depends on `path`, and the TypeScript return type follows it:
 
-| `path`                                   | Result                                                                          | Validated |
-| ---------------------------------------- | ------------------------------------------------------------------------------- | --------- |
-| none or `.`                              | The document                                                                    | yes       |
-| `$`                                      | The document wrapped in an array                                                | yes       |
-| other JSONPath starting with `$`         | Array of matches (empty if none)                                                | no        |
-| legacy path (`.artist`, `songDurations[0]`) | The value at that path                                                       | no        |
-| array of paths                           | Object keyed by path, as returned by Redis                                      | no        |
+| `path`                                      | Result                                     | Validated |
+| ------------------------------------------- | ------------------------------------------ | --------- |
+| none or `.`                                 | The document                               | yes       |
+| `$`                                         | The document wrapped in an array           | yes       |
+| other JSONPath starting with `$`            | Array of matches (empty if none)           | no        |
+| legacy path (`.artist`, `songDurations[0]`) | The value at that path                     | no        |
+| array of paths                              | Object keyed by path, as returned by Redis | no        |
 
 `fetch` resolves to `null` when the document does not exist.
 
@@ -249,12 +249,12 @@ A pool is useful for Node.js clusters or worker threads sharing a limited number
 
 All errors are exported from the package.
 
-| Error                    | Thrown when                                                                      |
-| ------------------------ | -------------------------------------------------------------------------------- |
-| `ServerUnavailableError` | A guarded operation runs while the connection is not open (or not ready).        |
-| `CommandTimeoutError`    | A guarded operation exceeds the command timeout.                                 |
-| `InvalidKeyError`        | An id or prefix is null, undefined, an empty string, or an empty buffer.         |
-| `ValidationError`        | A document fails schema validation. The failures are in `error.issues`.          |
+| Error                    | Thrown when                                                               |
+| ------------------------ | ------------------------------------------------------------------------- |
+| `ServerUnavailableError` | A guarded operation runs while the connection is not open (or not ready). |
+| `CommandTimeoutError`    | A guarded operation exceeds the command timeout.                          |
+| `InvalidKeyError`        | An id or prefix is null, undefined, an empty string, or an empty buffer.  |
+| `ValidationError`        | A document fails schema validation. The failures are in `error.issues`.   |
 
 ```ts
 import { ValidationError } from '@storehouse/redis';
@@ -274,7 +274,7 @@ try {
 - Helpers: `getManager`, `getConnection`, `getPoolManager`, `getPoolConnection`
 - Models: `Schema`, `Repository`
 - Errors: `ServerUnavailableError`, `CommandTimeoutError`, `InvalidKeyError`, `ValidationError`
-- Types: `RedisManagerArg`, `RedisPoolManagerArg`, `OperationGuard`, `GetPathType`, `JsonGetResult`, `JsonDocument`, `SanitizedSearchOptions`, `RedisHealthCheckResult`, `RedisClientHealthCheckResult`
+- Types: `RedisManagerArg`, `RedisPoolManagerArg`, `OperationGuard`, `GetPathType`, `JsonGetResult`, `JsonDocument`, `SanitizedCreateIndexOptions`, `RedisHealthCheckResult`, `RedisClientHealthCheckResult`
 
 ## Development
 

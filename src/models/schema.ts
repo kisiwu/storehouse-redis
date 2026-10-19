@@ -44,7 +44,7 @@ function isRootPath(path: RedisVariadicArgument): boolean {
  * Represents the search options for creating a RediSearch index.
  * Excludes the 'ON' and 'PREFIX' options, which are automatically set by the schema (ON: 'JSON', PREFIX: prefix)
  */
-export type SanitizedSearchOptions = Omit<CreateOptions, 'ON' | 'PREFIX'>;
+export type SanitizedCreateIndexOptions = Omit<CreateOptions, 'ON' | 'PREFIX'>;
 
 export type JsonDocument<TSchema extends StandardSchemaV1> = StandardSchemaV1.InferOutput<TSchema> &
   Record<string, RedisJSON>;
@@ -56,10 +56,18 @@ export class Schema<TSchema extends StandardSchemaV1> {
   #prefix: string;
   #schema: TSchema;
   #searchSchema: RediSearchSchema;
-  #options?: SanitizedSearchOptions | undefined;
+  #createIndexOptions?: SanitizedCreateIndexOptions | undefined;
 
   get prefix(): string {
     return this.#prefix;
+  }
+
+  get createIndexOptions(): Readonly<SanitizedCreateIndexOptions> | undefined {
+    return this.#createIndexOptions;
+  }
+
+  get searchSchema(): Readonly<RediSearchSchema> {
+    return this.#searchSchema;
   }
 
   /**
@@ -74,34 +82,20 @@ export class Schema<TSchema extends StandardSchemaV1> {
     prefix: string,
     schema: TSchema,
     searchSchema: RediSearchSchema,
-    options?: SanitizedSearchOptions | undefined
+    options?: SanitizedCreateIndexOptions | undefined
   ) {
     this.#prefix = toValidPrefix(prefix);
     this.#schema = schema;
     this.#searchSchema = searchSchema;
-    this.#options = options;
+    this.#createIndexOptions = options;
   }
 
   /**
-   * Creates the index for the JSON Documents in Redis.
-   * @param client the Redis client to use for creating the index
+   * Validates a value against the schema.
+   * @param value the value to validate against the schema
+   * @param options optional validation options
+   * @returns the result of the validation, including any errors if validation fails
    */
-  async createIndex(client: RedisClientType | RedisClientPoolType): Promise<void> {
-    try {
-      await client.ft.create('idx:' + this.#prefix, this.#searchSchema, {
-        ...(this.#options || {}),
-        ON: 'JSON',
-        PREFIX: this.#prefix,
-      });
-    } catch (e) {
-      if (e instanceof Error && e.message === 'Index already exists') {
-        //
-      } else {
-        throw e;
-      }
-    }
-  }
-
   async validate(
     value: unknown,
     options?: StandardSchemaV1.Options | undefined
@@ -272,8 +266,14 @@ export class Repository<TSchema extends StandardSchemaV1> {
    * Creates the index for the JSON Documents in Redis.
    * @returns a promise that resolves when the index has been created successfully
    */
-  async createIndex(): Promise<void> {
-    await this.exec(() => this.#schema.createIndex(this.#client));
+  async createIndex(): Promise<'OK'> {
+    return await this.exec(() =>
+      this.#client.ft.create('idx:' + this.#schema.prefix, this.#schema.searchSchema, {
+        ...(this.#schema.createIndexOptions || {}),
+        ON: 'JSON',
+        PREFIX: this.#schema.prefix,
+      })
+    );
   }
 
   /**

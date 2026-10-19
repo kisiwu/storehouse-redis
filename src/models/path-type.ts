@@ -27,10 +27,14 @@ type CleanPath<P extends string> = StripPrefix<NormalizePath<P>>;
 type Step<T, Key extends string> = T extends any[]
   ? Key extends `${number}`
     ? T[number]
-    : unknown
+    : Key extends '*'
+      ? T[number]
+      : unknown
   : Key extends keyof T
     ? T[Key]
-    : unknown;
+    : Key extends '*'
+      ? T[keyof T]
+      : unknown;
 
 // Recursive engine walking down the cleaned string array segments
 type ResolvePath<T, P extends string> = P extends `${infer Head}.${infer Tail}`
@@ -39,7 +43,7 @@ type ResolvePath<T, P extends string> = P extends `${infer Head}.${infer Tail}`
 
 // Determines if a path contains indefinite or wildcard segments (like "..", "*", "?", ":", ",")
 type IsIndefinite<P extends string> = P extends
-  `${string}..${string}` | `${string}*${string}` | `${string}?${string}` | `${string}:${string}` | `${string},${string}`
+  `${string}..${string}` | `${string}?${string}` | `${string}:${string}` | `${string},${string}`
   ? true
   : false;
 
