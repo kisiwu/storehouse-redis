@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/typedoc-plugin-markdown/typedoc-plugin-markdown.schema.json",
+  "cleanOutputDir": true,
+  "entryPoints": [
+    "src"
+  ],
+  "out": "./docs",
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "includeVersion": true,
+  "hideGenerator": true
+}

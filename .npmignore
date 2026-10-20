@@ -19,3 +19,4 @@ pnpm-workspace.*
 prettier.config.*
 tsconfig.json
 tsconfig.*.json
+typedoc.json

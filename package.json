@@ -5,6 +5,7 @@
   "main": "lib/index.js",
   "scripts": {
     "build": "pnpm exec tsc",
+    "docs": "typedoc",
     "format": "cross-env NODE_OPTIONS=--experimental-strip-types prettier --write ./src ./tests",
     "format:check": "cross-env NODE_OPTIONS=--experimental-strip-types prettier --check ./src ./tests",
     "format:staged": "cross-env NODE_OPTIONS=--experimental-strip-types lint-staged",
@@ -52,6 +53,7 @@
     "redis": "^6.3.0",
     "ts-jest": "^29.4.14",
     "ts-node": "^10.9.2",
+    "typedoc": "^0.28.20",
     "typescript": "npm:@typescript/typescript6@^6.0.0",
     "typescript-eslint": "^8.71.2",
     "valibot": "^1.5.0"
