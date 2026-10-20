@@ -1,0 +1,21 @@
+.husky
+.vscode
+/dev
+/docs
+/src
+/tests
+
+# dotenv environment variable files
+.env
+.env.*
+!.env.example
+
+.prettierignore
+eslint.config.*
+jest.config.*
+jest.setup.*
+lint-staged.config.*
+pnpm-workspace.*
+prettier.config.*
+tsconfig.json
+tsconfig.*.json

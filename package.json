@@ -1,7 +1,7 @@
 {
   "name": "@storehouse/redis",
   "version": "0.1.0",
-  "description": "",
+  "description": "Redis manager for @storehouse/core",
   "main": "lib/index.js",
   "scripts": {
     "build": "pnpm exec tsc",
@@ -9,6 +9,7 @@
     "format:check": "cross-env NODE_OPTIONS=--experimental-strip-types prettier --check ./src ./tests",
     "format:staged": "cross-env NODE_OPTIONS=--experimental-strip-types lint-staged",
     "lint": "eslint .",
+    "prepublishOnly": "pnpm build",
     "test": "jest",
     "test:watch": "jest --watch"
   },
